@@ -21,6 +21,10 @@ test('管理后台页面使用 ZJMF_ADMIN_TOKEN 登录且不嵌入真实密码',
   assert.match(html, /魔方财务 API/);
   assert.match(html, /webhook_headers/);
   assert.match(html, /webhook_template/);
+  assert.match(html, /name="check_interval"/);
+  assert.match(html, /name="api_timeout_ms"/);
+  assert.match(html, /api_timeout:Math\.max/);
+  assert.match(html, /name="api_password" type="text"/);
   assert.match(html, /id="editModal"/);
   assert.match(html, /保存服务商/);
   assert.match(html, /保存服务器/);
@@ -31,7 +35,7 @@ test('管理后台页面使用 ZJMF_ADMIN_TOKEN 登录且不嵌入真实密码',
   assert.match(html, /const scrub=/);
   assert.match(html, /background-size:50px 50px/);
   assert.match(html, /--bg:#f5f7fb/);
-  assert.match(html, /留空则保留旧密钥/);
+  assert.match(html, /管理后台登录后会显示/);
   assert.match(html, /localStorage\.getItem\('zjmf_admin_token'\)/);
   assert.doesNotMatch(html, /服务器 IP|1\.2\.3\.4/);
   assert.doesNotMatch(html, /super-secret-admin-password/);

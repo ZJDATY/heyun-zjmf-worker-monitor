@@ -20,11 +20,12 @@ class FakeStatement {
     }
     if (this.sql.includes('FROM providers ORDER BY name')) {
       return {
-        results: this.data.providers.map(({ name, display_name, api_base_url, api_account, created_at, updated_at }) => ({
+        results: this.data.providers.map(({ name, display_name, api_base_url, api_account, api_password, created_at, updated_at }) => ({
           name,
           display_name,
           api_base_url,
           api_account,
+          api_password,
           created_at,
           updated_at,
         })),
@@ -146,7 +147,7 @@ test('管理接口缺少 ZJMF_ADMIN_TOKEN 对应的 Bearer Token 时拒绝访问
   assert.equal(res.status, 401);
 });
 
-test('管理概览返回配置但不泄露服务商密钥和 pushplus token', async () => {
+test('管理概览返回配置并仅隐藏 pushplus token 和服务器 IP', async () => {
   const res = await handleRequest(
     new Request('https://worker.example/api/admin/overview', {
       headers: { authorization: 'Bearer admin-password' },
@@ -158,8 +159,8 @@ test('管理概览返回配置但不泄露服务商密钥和 pushplus token', as
 
   assert.equal(res.status, 200);
   assert.equal(data.settings.pushplus_token, '已配置');
-  assert.equal(data.providers[0].api_password, undefined);
-  assert.doesNotMatch(text, /provider-secret|pushplus-secret|203\.0\.113\.10/);
+  assert.equal(data.providers[0].api_password, 'provider-secret');
+  assert.doesNotMatch(text, /pushplus-secret|203\.0\.113\.10/);
 });
 
 test('管理概览优先返回启用服务器，避免表单默认选中旧禁用记录', async () => {

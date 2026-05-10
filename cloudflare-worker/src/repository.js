@@ -53,7 +53,7 @@ export class D1Repository {
 
   async listProviders() {
     const { results } = await this.db.prepare(
-      'SELECT name, display_name, api_base_url, api_account, created_at, updated_at FROM providers ORDER BY name',
+      'SELECT name, display_name, api_base_url, api_account, api_password, created_at, updated_at FROM providers ORDER BY name',
     ).all();
     return results || [];
   }
