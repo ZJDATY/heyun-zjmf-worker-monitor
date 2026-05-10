@@ -25,6 +25,8 @@
 
 Cloudflare Worker 不能执行本机 ICMP `ping`，所以当前 Worker 版只支持 `api_only`。原 Python 里的 `ping_only`、`ping_then_api`、`api_then_ping` 不适用于 Worker。
 
+Worker 版已去掉定时重启，只在 API 检测异常达到阈值后触发 `hard_reboot`，并按每小时窗口限制重启次数。
+
 ## 快速部署（5 步完成）
 
 无需修改任何代码或配置文件，即可部署专属于你的魔方财务监控实例。
@@ -52,33 +54,36 @@ Cloudflare Worker 不能执行本机 ICMP `ping`，所以当前 Worker 版只支
 |-------------|----|----------|
 | `CLOUDFLARE_API_TOKEN` | 第 2 步获取的 Token | 必填 |
 | `ZJMF_ADMIN_TOKEN` | 任意强密码字符串（用于登录管理后台） | 必填 |
-| `CLOUDFLARE_ACCOUNT_ID` | 你的 Cloudflare Account ID | 推荐 |
-| `ZJMF_API_ACCOUNT` | 魔方财务登录邮箱或手机号 | 必填 |
-| `ZJMF_API_PASSWORD` | 魔方财务 API 密钥 | 必填 |
-| `ZJMF_SERVER_ID` | 魔方财务产品 ID | 必填 |
-| `ZJMF_SERVER_IP` | 服务器 IP | 推荐 |
+| `CLOUDFLARE_ACCOUNT_ID` | 你的 Cloudflare Account ID | 推荐（多账号时必填） |
+| `ZJMF_API_ACCOUNT` | 魔方财务登录邮箱或手机号 | 可选，用于首次自动初始化 |
+| `ZJMF_API_PASSWORD` | 魔方财务 API 密钥 | 可选，用于首次自动初始化 |
+| `ZJMF_SERVER_ID` | 魔方财务产品 ID | 可选，用于首次自动初始化 |
+| `ZJMF_SERVER_NAME` | 状态页显示名称 | 可选 |
+| `ZJMF_SERVER_IP` | 服务器 IP，仅保存配置，状态页/API 不显示 | 可选 |
 | `PUSHPLUS_TOKEN` | pushplus 用户 token | 可选 |
+
+只有 `CLOUDFLARE_API_TOKEN` 和 `ZJMF_ADMIN_TOKEN` 是部署硬性必填。魔方财务相关 Secrets 不填也能完成部署，之后可在 `/admin` 管理后台添加服务商和监控项。
 
 ### 第 4 步 — 运行 GitHub Actions
 
-进入 **Actions → Deploy to Cloudflare → Run workflow**。
+进入 **Actions → Deploy to Cloudflare → Run workflow**，或向 `main`/`master` 推送一次提交。
 
 工作流会自动完成：
 
 - 创建或复用 D1 数据库
 - 执行 D1 迁移
 - 注入 `ZJMF_ADMIN_TOKEN` 为 Worker Secret `ADMIN_TOKEN`
-- 部署 Worker（状态页 UI + 管理后台 + API + 定时监控任务）
-- 自动添加服务商、服务器监控配置
+- 部署 Worker（状态页 UI + 管理后台 + API + Cron 监控任务）
+- 如果填写了 `ZJMF_API_ACCOUNT`、`ZJMF_API_PASSWORD`、`ZJMF_SERVER_ID`，会自动添加服务商和服务器监控配置
 - 如果填写了 `PUSHPLUS_TOKEN`，会自动添加 pushplus 通知
 
 ### 第 5 步 — 访问你的状态页
 
-工作流成功后，在日志最后查看地址：
+工作流成功后，在日志最后查看真实地址。默认 Worker 名称是 `zjmf-monitor`，也可在仓库 **Settings → Secrets and variables → Actions → Variables** 里设置 `WORKER_NAME`。
 
-- 状态页：`https://<你的仓库名>.<你的 workers.dev 子域>.workers.dev/`
-- 管理后台：`https://<你的仓库名>.<你的 workers.dev 子域>.workers.dev/admin`
-- API：`https://<你的仓库名>.<你的 workers.dev 子域>.workers.dev/api/status`
+- 状态页：`https://<WORKER_NAME>.<你的 workers.dev 子域>.workers.dev/`
+- 管理后台：`https://<WORKER_NAME>.<你的 workers.dev 子域>.workers.dev/admin`
+- API：`https://<WORKER_NAME>.<你的 workers.dev 子域>.workers.dev/api/status`
 
 ## 本地测试
 
@@ -95,7 +100,7 @@ npm test
 npx wrangler@latest deploy --dry-run --outdir .wrangler-dry-run
 ```
 
-当前已通过 dry-run 打包校验，上传包大小约 `29.82 KiB`。
+上传包大小以 `wrangler` 实际输出为准。
 
 ## 部署步骤
 

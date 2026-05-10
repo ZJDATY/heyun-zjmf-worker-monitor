@@ -1,6 +1,6 @@
 # ZJMF 服务器监控与自动重启系统
 
-基于5状态机架构的云服务器监控，支持自动重启、定时重启、每日重启上限、Webhook通知。
+基于 5 状态机架构的云服务器监控，Worker 版支持异常自动重启、每小时重启上限、Webhook/pushplus 通知和管理后台。
 
 ## Cloudflare Worker 版
 
@@ -50,33 +50,36 @@ cloudflare-worker/README.md
 |-------------|----|----------|
 | `CLOUDFLARE_API_TOKEN` | 第 2 步获取的 Token | 必填 |
 | `ZJMF_ADMIN_TOKEN` | 任意强密码字符串（用于登录管理后台） | 必填 |
-| `CLOUDFLARE_ACCOUNT_ID` | 你的 Cloudflare Account ID | 推荐 |
-| `ZJMF_API_ACCOUNT` | 魔方财务登录邮箱或手机号 | 必填 |
-| `ZJMF_API_PASSWORD` | 魔方财务 API 密钥 | 必填 |
-| `ZJMF_SERVER_ID` | 魔方财务产品 ID | 必填 |
-| `ZJMF_SERVER_IP` | 服务器 IP | 推荐 |
+| `CLOUDFLARE_ACCOUNT_ID` | 你的 Cloudflare Account ID | 推荐（多账号时必填） |
+| `ZJMF_API_ACCOUNT` | 魔方财务登录邮箱或手机号 | 可选，用于首次自动初始化 |
+| `ZJMF_API_PASSWORD` | 魔方财务 API 密钥 | 可选，用于首次自动初始化 |
+| `ZJMF_SERVER_ID` | 魔方财务产品 ID | 可选，用于首次自动初始化 |
+| `ZJMF_SERVER_NAME` | 状态页显示名称 | 可选 |
+| `ZJMF_SERVER_IP` | 服务器 IP，仅保存配置，状态页/API 不显示 | 可选 |
 | `PUSHPLUS_TOKEN` | pushplus 用户 token | 可选 |
+
+只有 `CLOUDFLARE_API_TOKEN` 和 `ZJMF_ADMIN_TOKEN` 是部署硬性必填。魔方财务相关 Secrets 不填也能完成部署，之后可在 `/admin` 管理后台添加服务商和监控项。
 
 ### 第 4 步 — 运行 GitHub Actions
 
-进入 **Actions → Deploy to Cloudflare → Run workflow**。
+进入 **Actions → Deploy to Cloudflare → Run workflow**，或向 `main`/`master` 推送一次提交。
 
 工作流会自动完成：
 
 - 创建或复用 D1 数据库
 - 执行 D1 迁移
 - 注入 `ZJMF_ADMIN_TOKEN` 为 Worker Secret `ADMIN_TOKEN`
-- 部署 Worker（状态页 UI + 管理后台 + API + 定时监控任务）
-- 自动添加服务商、服务器监控配置
+- 部署 Worker（状态页 UI + 管理后台 + API + Cron 监控任务）
+- 如果填写了 `ZJMF_API_ACCOUNT`、`ZJMF_API_PASSWORD`、`ZJMF_SERVER_ID`，会自动添加服务商和服务器监控配置
 - 如果填写了 `PUSHPLUS_TOKEN`，会自动添加 pushplus 通知
 
 ### 第 5 步 — 访问你的状态页
 
-工作流成功后，在日志最后查看地址：
+工作流成功后，在日志最后查看真实地址。默认 Worker 名称是 `zjmf-monitor`，也可在仓库 **Settings → Secrets and variables → Actions → Variables** 里设置 `WORKER_NAME`。
 
-- 状态页：`https://<你的仓库名>.<你的 workers.dev 子域>.workers.dev/`
-- 管理后台：`https://<你的仓库名>.<你的 workers.dev 子域>.workers.dev/admin`
-- API：`https://<你的仓库名>.<你的 workers.dev 子域>.workers.dev/api/status`
+- 状态页：`https://<WORKER_NAME>.<你的 workers.dev 子域>.workers.dev/`
+- 管理后台：`https://<WORKER_NAME>.<你的 workers.dev 子域>.workers.dev/admin`
+- API：`https://<WORKER_NAME>.<你的 workers.dev 子域>.workers.dev/api/status`
 
 ## 架构
 
@@ -145,8 +148,7 @@ pip install requests
       "provider": "heyunidc",
       "check_method": "api_only",
       "enabled": true,
-      "daily_reboot_limit": 3,
-      "scheduled_reboot": "04:00"
+      "daily_reboot_limit": 3
     }
   ],
   "global_settings": {
@@ -174,11 +176,7 @@ python server_monitor.py --status
 # 持续监控（无服务器时自动发现）
 python server_monitor.py
 
-# 查看状态
-python server_monitor.py --status
-
 # 自定义检查间隔
-python server_monitor.py --interval 60
 python server_monitor.py --interval 60
 ```
 
@@ -204,8 +202,7 @@ python server_monitor.py --interval 60
 | `provider` | 对应provider的name | - |
 | `check_method` | 检测方式 | `api_only` |
 | `enabled` | 是否启用 | `true` |
-| `daily_reboot_limit` | 每日重启上限（0=不限） | 全局默认 |
-| `scheduled_reboot` | 定时重启（`HH:MM`） | 空 |
+| `daily_reboot_limit` | 每小时重启上限（0=不限，字段名沿用旧名称） | 全局默认 |
 
 ### global_settings
 
@@ -215,7 +212,7 @@ python server_monitor.py --interval 60
 | `suspect_threshold` | 连续异常N次确认宕机 | `2` |
 | `reboot_cooldown` | 重启冷却时间（秒） | `600` |
 | `recover_timeout` | 重启后恢复等待超时（秒） | `300` |
-| `default_daily_reboot_limit` | 默认每日重启上限 | `3` |
+| `default_daily_reboot_limit` | 默认每小时重启上限（字段名沿用旧名称） | `3` |
 | `webhook_url` | 通知地址 | 空 |
 | `webhook_type` | 通知类型 | `custom` |
 | `log_level` | 日志级别（仅控制台输出） | `INFO` |
@@ -254,7 +251,7 @@ python server_monitor.py --interval 60
 
 1. **疑似阈值**：首次异常进入suspect，连续N次才确认DOWN，避免误判
 2. **重启冷却**：两次重启之间至少间隔 `reboot_cooldown` 秒
-3. **每日上限**：每台服务器每天最多重启 `daily_reboot_limit` 次
+3. **每小时上限**：每台服务器每小时最多重启 `daily_reboot_limit` 次
 4. **恢复超时**：重启后超过 `recover_timeout` 秒未恢复，重新标记DOWN
 5. **JWT自动刷新**：2小时过期，提前10分钟自动重新登录
 
@@ -277,7 +274,7 @@ curl -X PUT -H "Authorization: JWT YOUR_TOKEN" "https://www.heyunidc.cn/v1/hosts
 ## 日志示例
 
 ```
-2026-05-09 22:00:00 [INFO] 配置加载：1 个服务商，0 个服务器，检查间隔 300s，疑似阈值 2次，每日重启上限 3次
+2026-05-09 22:00:00 [INFO] 配置加载：1 个服务商，0 个服务器，检查间隔 300s，疑似阈值 2次，每小时重启上限 3次
 2026-05-09 22:00:01 [INFO] [核云] 正在登录...
 2026-05-09 22:00:02 [INFO] [核云] 登录成功
 2026-05-09 22:00:03 [INFO]   [HEALTHY] 我的服务器 (ID:4075) status=on
