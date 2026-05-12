@@ -33,6 +33,7 @@ class FakeStatement {
     }
     if (this.sql.includes('SELECT * FROM servers ORDER BY id')) return { results: this.data.servers };
     if (this.sql.includes('FROM servers s')) return { results: this.data.status };
+    if (this.sql.includes('ORDER BY created_at DESC, id DESC')) return { results: this.data.recentChecks };
     if (this.sql.includes('FROM check_results')) return { results: this.data.dailyResults };
     if (this.sql.includes('FROM events')) return { results: this.data.events };
     throw new Error(`Unexpected SQL: ${this.sql}`);
@@ -154,6 +155,10 @@ function env(overrides = {}) {
       dailyResults: overrides.dailyResults || [
         { server_id: '8564', date_key: '2026-05-10', total: 2, ok_count: 1, avg_latency_ms: 1500 },
       ],
+      recentChecks: overrides.recentChecks || [
+        { ok: 1, latency_ms: 120, created_at: 1778385053 },
+        { ok: 0, latency_ms: 0, created_at: 1778384753 },
+      ],
     }),
   };
 }
@@ -238,6 +243,8 @@ test('公共状态接口返回真实天级可用性和事件历史且不泄露�
   assert.equal(data.servers[0].daily_history.length, 2);
   assert.equal(data.servers[0].daily_history[0].uptime, '66.667%');
   assert.equal(data.servers[0].daily_history[0].failures, 1);
+  assert.equal(data.servers[0].recent_checks.length, 2);
+  assert.equal(data.servers[0].recent_checks[0].latency_ms, 120);
   assert.equal(data.servers[0].events[0].label, '触发重启');
   assert.doesNotMatch(text, /203\.0\.113\.10|api\.example|provider-secret|pushplus-secret/);
 });

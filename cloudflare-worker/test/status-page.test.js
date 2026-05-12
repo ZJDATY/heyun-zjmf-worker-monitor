@@ -22,6 +22,7 @@ test('状态页渲染服务器状态并转义 HTML', () => {
       events: [
         { label: '检测异常', level: 'warning', message: '服务不可达', created_at: 1778384953 },
         { label: '重启指令已发送', level: 'warning', message: '已发送硬重启', created_at: 1778385053 },
+        { label: '旧事件', level: 'info', message: '应被截断', created_at: 1778384853 },
       ],
     },
   ]);
@@ -33,11 +34,13 @@ test('状态页渲染服务器状态并转义 HTML', () => {
   assert.match(html, /服务/);
   assert.match(html, /未分组/);
   assert.match(html, /status-card/);
-  assert.match(html, /近 2 天可用性/);
+  assert.match(html, /近 30 天可用性/);
   assert.match(html, /最近 60 次探测/);
   assert.match(html, /class="day-track"/);
-  assert.match(html, /aria-label="近 2 天可用性"/);
-  assert.equal((html.match(/class="day-segment/g) || []).length, 2);
+  assert.match(html, /aria-label="近 30 天可用性"/);
+  assert.equal((html.match(/class="day-segment/g) || []).length, 30);
+  assert.equal((html.match(/class="day-segment placeholder"/g) || []).length, 28);
+  assert.doesNotMatch(html, /class="day-segment empty"/);
   assert.match(html, /100\.000% 可用率/);
   assert.match(html, /不可用时长 0s/);
   assert.match(html, /探测 12 次，失败 1 次/);
@@ -45,8 +48,12 @@ test('状态页渲染服务器状态并转义 HTML', () => {
   assert.match(html, /translateY\(-7px\)/);
   assert.doesNotMatch(html, /active/);
   assert.match(html, /事件历史/);
+  assert.match(html, /查看更多/);
+  assert.match(html, /history-card/);
+  assert.equal((html.match(/class="timeline-item/g) || []).length, 2);
   assert.match(html, /检测异常/);
   assert.match(html, /重启指令已发送/);
+  assert.doesNotMatch(html, /旧事件/);
   assert.match(html, /data-tip=/);
   assert.match(html, /aria-label="最近探测详情"/);
   assert.match(html, /tcp/);
@@ -76,4 +83,29 @@ test('状态页不显示服务器 IP，名称为 IP 时改用泛化名称', () =
 
   assert.match(html, /服务器 #8564/);
   assert.doesNotMatch(html, /203\.0\.113\.10/);
+});
+
+test('状态页最近探测条使用真实探测时间和延迟', () => {
+  const t1 = new Date(1778385053 * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+  const t2 = new Date(1778384753 * 1000).toLocaleString('zh-CN', { timeZone: 'Asia/Shanghai', hour12: false });
+  const html = renderStatusPage([
+    {
+      id: '8564',
+      name: '主服务器',
+      state: 'healthy',
+      last_check_time: 1778385053,
+      last_latency_ms: 9819,
+      recent_checks: [
+        { ok: true, latency_ms: 120, created_at: 1778385053 },
+        { ok: false, latency_ms: 0, created_at: 1778384753 },
+      ],
+    },
+  ]);
+
+  assert.match(html, new RegExp(t1.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(html, new RegExp(t2.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')));
+  assert.match(html, /运行正常 · 120ms/);
+  assert.match(html, /探测失败 · -/);
+  assert.equal((html.match(/class="probe-placeholder"/g) || []).length, 58);
+  assert.doesNotMatch(html, /运行正常 · 9819ms/);
 });

@@ -63,10 +63,15 @@ async function publicStatus(repo) {
   const ids = servers.map((server) => String(server.id));
   const daily = await repo.listDailyHistory(ids);
   const events = await repo.listPublicEvents(ids);
+  const recent = new Map();
+  for (const server of servers) {
+    recent.set(String(server.id), await repo.listRecentChecks(server.id));
+  }
   return servers.map((server) => ({
     ...server,
     daily_history: daily.get(String(server.id)) || [],
     events: (events.get(String(server.id)) || []).map(publicEvent),
+    recent_checks: recent.get(String(server.id)) || [],
   }));
 }
 

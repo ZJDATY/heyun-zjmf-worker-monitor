@@ -104,6 +104,21 @@ export class D1Repository {
       .run();
   }
 
+  async listRecentChecks(serverId, limit = 60) {
+    const { results } = await this.db.prepare(`
+      SELECT ok, latency_ms, created_at
+      FROM check_results
+      WHERE server_id = ?1
+      ORDER BY created_at DESC, id DESC
+      LIMIT ?2
+    `).bind(serverId, limit).all();
+    return (results || []).map((row) => ({
+      ok: Number(row.ok) === 1,
+      latency_ms: Number(row.latency_ms || 0),
+      created_at: Number(row.created_at || 0),
+    }));
+  }
+
   async countRecentReboots(serverId, since) {
     const row = await this.db.prepare(`
       SELECT COUNT(*) AS count
